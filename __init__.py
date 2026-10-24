@@ -110,7 +110,16 @@ gui_hooks.browser_menus_did_init.append(_browser_menus)
 
 gui_hooks.profile_did_open.append(_offer_setup)
 gui_hooks.profile_will_close.append(_close_player)
-gui_hooks.addon_manager_will_install_addon.append(_before_install)
+if hasattr(gui_hooks, "addon_manager_will_install_addon"):
+    gui_hooks.addon_manager_will_install_addon.append(_before_install)
+else:  # Anki before 2.1.66 has no such hook: around the step that moves user_files/
+    _backup_user_files = mw.addonManager.backupUserFiles
+
+    def _backup_after_closing(module):
+        _before_install(mw.addonManager, module)
+        _backup_user_files(module)
+
+    mw.addonManager.backupUserFiles = _backup_after_closing
 
 debuglog.install()
 config.install()
