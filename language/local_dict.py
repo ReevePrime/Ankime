@@ -77,24 +77,46 @@ _local = threading.local()
 _lock = threading.Lock()
 _generation = 0   # bumped by every import or removal: the index and caches are rebuilt
 _index = None     # _Index of _generation
+_all_cons = []    # every thread's connection, for close_all()
+_cons_lock = threading.Lock()   # not _lock: _index() connects while holding that
+_epoch = 0        # bumped by close_all(): threads drop their closed connections
 
 
 def _connect():
     """This thread's connection to the database (made, with the tables, if need be)."""
     cons = getattr(_local, "cons", None)
-    if cons is None:
+    if cons is None or getattr(_local, "epoch", None) != _epoch:
         cons = _local.cons = {}
+        _local.epoch = _epoch
     con = cons.get(str(DB_PATH))
     if con is None:
         DB_PATH.parent.mkdir(parents=True, exist_ok=True)
-        con = sqlite3.connect(str(DB_PATH), timeout=30)
+        # not tied to this thread, so close_all() can close it from the main thread
+        con = sqlite3.connect(str(DB_PATH), timeout=30, check_same_thread=False)
         con.execute("PRAGMA journal_mode=WAL")  # lookups go on during an import
         if con.execute("PRAGMA user_version").fetchone()[0] != SCHEMA_VERSION:
             con.executescript(_SCHEMA)
             con.execute(f"PRAGMA user_version={SCHEMA_VERSION}")
             con.commit()
         cons[str(DB_PATH)] = con
+        with _cons_lock:
+            _all_cons.append(con)
     return con
+
+
+def close_all():
+    """Closes every thread's connection: on Windows, Anki can't move user_files/ aside to
+    update the add-on while the database is open. The next lookup connects again."""
+    global _epoch
+    with _cons_lock:
+        _epoch += 1
+        cons = _all_cons[:]
+        _all_cons.clear()
+    for con in cons:
+        try:
+            con.close()
+        except sqlite3.Error:
+            pass
 
 
 def _changed():

@@ -45,6 +45,17 @@ def _close_player():
     transcribe.stop_all()
 
 
+def _before_install(_manager, package):
+    """Before this add-on is updated over itself: Anki moves user_files/ aside first, which
+    Windows refuses while a file in it is open. Ankime runs on until Anki restarts, logging
+    nowhere; a dictionary lookup in the meantime reopens the database."""
+    if package != __name__:
+        return
+    debuglog.uninstall()
+    from .language import local_dict
+    local_dict.close_all()
+
+
 def open_settings(*_):
     from .dialogs.settings import open_settings as show
     show()
@@ -99,6 +110,7 @@ gui_hooks.browser_menus_did_init.append(_browser_menus)
 
 gui_hooks.profile_did_open.append(_offer_setup)
 gui_hooks.profile_will_close.append(_close_player)
+gui_hooks.addon_manager_will_install_addon.append(_before_install)
 
 debuglog.install()
 config.install()

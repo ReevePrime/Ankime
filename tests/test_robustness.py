@@ -1,6 +1,6 @@
 """Bolding the mined word where it is, subtitle encodings and names, the study day, styles that
 would escape their box, ffmpeg and Yomitan timeouts and proxies, background jobs going stale,
-undo history and the batch stopping with the player."""
+undo history, the batch stopping with the player and the log closing for an update."""
 import datetime
 import subprocess
 import threading
@@ -8,7 +8,7 @@ import threading
 import pytest
 
 from ankime.cards import media, notes
-from ankime.core import immersion
+from ankime.core import debuglog, immersion
 from ankime.language import frequency, knowledge, sanitize, yomitan
 from ankime.subs import subtitles
 from ankime.core.model import Event, Token
@@ -221,3 +221,24 @@ def test_opening_another_video_stops_the_batch(player, monkeypatch):  # noqa: F8
     player._stop_batch("another video was opened")
     assert not player._batch.queue
     assert player.batch_box.setVisible.call_args[0][0] is False
+
+
+# --- updating the add-on -------------------------------------------------------------------
+
+def test_the_log_file_closes_for_an_update_and_stays_closed(tmp_path, monkeypatch):
+    """Anki renames user_files/ before updating the add-on, which Windows refuses while the
+    log is open; a closed handler still on the logger would open it again."""
+    import logging
+    monkeypatch.setattr(debuglog, "USER_FILES", tmp_path)
+    monkeypatch.setattr(debuglog, "LOG_FILE", tmp_path / "ankime.log")
+    logger = logging.getLogger("ankime")
+    debuglog.install()
+    try:
+        logger.info("before")
+        debuglog.uninstall()
+        logger.info("after")
+        (tmp_path / "ankime.log").rename(tmp_path / "moved.log")
+        assert "before" in (tmp_path / "moved.log").read_text(encoding="utf-8")
+        assert not (tmp_path / "ankime.log").exists()
+    finally:
+        debuglog.uninstall()

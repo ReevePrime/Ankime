@@ -1,6 +1,7 @@
 """Ankime's own dictionaries (local_dict.py, deinflect.py): importing a Yomitan dictionary,
 splitting lines and answering yomitan-api's calls the way Yomitan does."""
 import json
+import threading
 import zipfile
 
 import pytest
@@ -279,3 +280,20 @@ def test_dictionary_content_is_escaped_and_pictures_and_links_dropped(imported):
     assert "<script>" not in gloss and "&lt;script&gt;" in gloss
     assert "img" not in gloss and "href" not in gloss and "iframe" not in gloss
     assert "see" in gloss and "inner" in gloss
+
+
+# --- updating the add-on ---------------------------------------------------------------
+
+def test_close_all_lets_user_files_move_and_lookups_reconnect(imported):
+    """Anki renames user_files/ before updating the add-on, which Windows refuses while the
+    database is open in any thread."""
+    worker = threading.Thread(target=lambda: local_dict.dictionaries())
+    worker.start()
+    worker.join()
+    assert local_dict.dictionaries()  # the main thread's connection too
+    local_dict.close_all()
+    moved = imported.parent / "moved"
+    imported.rename(moved)
+    moved.rename(imported)
+    assert [d["title"] for d in local_dict.dictionaries()] == ["Test"]
+    local_dict.close_all()

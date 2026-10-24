@@ -5,13 +5,15 @@ is installed in this Python (pip install "aqt[qt6]==<version>") without a window
 and once the profile is open: checks the add-on loaded, walks through the setup wizard
 (shown on a new install), opens the settings, creates the note type, adds a word card, reads
 the known words back, removes the card, opens the browser (the add-on adds a menu there),
-and adds a card through Anki's Add window (review before adding). The player isn't started: it needs libmpv and a screen.
+adds a card through Anki's Add window (review before adding), and installs the
+package over itself, as an update does. The player isn't started: it needs libmpv and a screen.
 
     python tools/anki_smoke.py [--base DIR] [--show]
 
 Exits 0 if every check passed. A dialog that would wait for a click fails the run instead."""
 import argparse
 import json
+import logging
 import os
 import shutil
 import sys
@@ -321,8 +323,30 @@ def run_checks(mw):
                 raise AssertionError(f"no Ankime action in the browser's Notes menu: {titles}")
 
         check("browser menu added", browser)
-        check_panel_style(lambda: check_popup_size(lambda: check_review(
-            lambda: finish(1 if results["dialogs"] or results["deprecated"] else 0))))
+        check_panel_style(lambda: check_popup_size(lambda: check_review(lambda: (
+            check("updates over itself", update),
+            finish(1 if results["dialogs"] or results["deprecated"] else 0)))))
+
+    def update():
+        """Installing the package over the add-on, as an update from AnkiWeb does: Anki
+        moves user_files/ aside first, which Windows refuses while the log or the dictionary
+        database (opened here in two threads) is open. Ankime closes them before."""
+        local_dict = import_module(f"{ADDON_ID}.language.local_dict")
+        worker = threading.Thread(target=local_dict.dictionaries)
+        worker.start()
+        worker.join()
+        local_dict.dictionaries()
+        logging.getLogger(ADDON_ID).info("update")  # the log is open too
+        version = json.loads((build.ROOT / "manifest.json").read_text(encoding="utf-8"))
+        package = build.ROOT / "dist" / f"ankime-{version['human_version']}.ankiaddon"
+        result = mw.addonManager.install(str(package), manifest={"package": ADDON_ID})
+        if not hasattr(result, "name"):
+            raise AssertionError(f"not installed: {result}")
+        user_files = Path(mw.addonManager.addonsFolder(ADDON_ID)) / "user_files"
+        if not (user_files / "dictionaries.sqlite").exists():
+            raise AssertionError(f"user_files/ not kept: {list(user_files.glob('*'))}")
+        local_dict.dictionaries()  # still works, reconnected
+        return "user_files/ kept"
 
     def check_panel_style(then):
         """The subtitle panel, on its own (the player needs libmpv): a word style chosen in

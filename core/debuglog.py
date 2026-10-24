@@ -24,3 +24,12 @@ def install():
     logger.addHandler(handler)
     logger.setLevel(logging.INFO)
     logger.propagate = False  # not into Anki's own log / console
+
+
+def uninstall():
+    """Closes the log file: on Windows, Anki can't move user_files/ aside to update the
+    add-on while it is open. Removed, not just closed: a closed handler reopens its file."""
+    logger = logging.getLogger(_LOGGER)
+    for h in [h for h in logger.handlers if isinstance(h, RotatingFileHandler)]:
+        logger.removeHandler(h)
+        h.close()
