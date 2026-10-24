@@ -54,3 +54,38 @@ jobs:
       - run: pip install ${{ matrix.packages }}
         shell: bash  # PowerShell, the default here, reads the < of a version pin as a redirection
       - run: python tools/anki_smoke.py
+
+  # Every push to main that passes the jobs above publishes the build: the "dev" pre-release is
+  # replaced each time (stable link: releases/download/dev/ankime.ankiaddon), and a version in
+  # manifest.json with no release yet gets its own v<version> release, marked latest.
+  release:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: [test, anki]
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    concurrency: release
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - run: python tools/build.py
+      - name: Publish dev build
+        run: |
+          cp dist/ankime-*.ankiaddon dist/ankime.ankiaddon
+          gh release delete dev --cleanup-tag --yes || true
+          gh release create dev dist/ankime.ankiaddon --prerelease --target "$GITHUB_SHA" \
+            --title "Development build" \
+            --notes "Built from $GITHUB_SHA, the latest commit on main. Install via Tools → Add-ons → Install from file…"
+      - name: Publish version release
+        run: |
+          version=$(python -c "import json; print(json.load(open('manifest.json'))['human_version'])")
+          if git ls-remote --exit-code --tags origin "refs/tags/v$version" > /dev/null; then
+            echo "v$version is already released; bump human_version in manifest.json for a new one"
+          else
+            gh release create "v$version" "dist/ankime-$version.ankiaddon" --target "$GITHUB_SHA" \
+              --title "Ankime $version" --generate-notes --latest
+          fi
