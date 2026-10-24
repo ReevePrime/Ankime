@@ -8,7 +8,7 @@ import zipfile
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
-EXCLUDE_DIRS = ("tests/", "tools/", ".github/", "user_files/", "dist/")
+EXCLUDE_DIRS = ("tests/", "tools/", ".github/", "docs/", "user_files/", "dist/")
 EXCLUDE_FILES = {".gitignore", "ruff.toml", "meta.json"}
 
 

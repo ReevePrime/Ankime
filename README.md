@@ -2,7 +2,7 @@
 
 Ankime is an Anki add-on for learning Japanese by watching anime. You get a video player with clickable subtitles, you look words up without leaving the episode, and when a line is worth keeping you press one key and it becomes a card, audio and screenshot included.
 
-<img width="1460" height="760" alt="image" src="https://github.com/user-attachments/assets/0774aa06-22a7-4336-a5c7-ab12a560631f" />
+<img width="1460" height="760" alt="Ankime's player: an episode with clickable subtitles and a word's definition" src="docs/screenshot.png" />
 
 What it does:
 
