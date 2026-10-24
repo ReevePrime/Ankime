@@ -1,0 +1,56 @@
+name: tests
+
+on: [push, pull_request]
+
+jobs:
+  test:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        # Windows is where most users are; paths differ. Ubuntu 24.04, not -latest:
+        # setup-python has no Python 3.9 for Ubuntu 26.04.
+        os: [ubuntu-24.04, windows-latest]
+        python: ["3.9", "3.13"]   # Anki 2.1.50 bundles 3.9; current Anki a recent 3.x
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+      - run: pip install pytest requests ruff
+      - run: ruff check .
+      - run: python -m pytest -q tests
+      - run: python tools/build.py
+
+  # The tests above stub Anki out; this starts the real one (from PyPI, no window shown) with
+  # the add-on installed, see tools/anki_smoke.py. Windows only: it needs no system packages
+  # for Qt there.
+  anki:
+    runs-on: windows-latest
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # the oldest Anki the manifest allows (min_point_version), with the Qt it shipped
+          - name: "2.1.50"
+            python: "3.9"
+            packages: >-
+              "aqt[qt6]==2.1.50" pyqt6==6.2.3 pyqt6-qt6==6.2.4 pyqt6-webengine==6.2.1
+              pyqt6-webengine-qt6==6.2.4 "pyqt6-sip<13.5"
+          - name: "25.09"
+            python: "3.13"
+            packages: '"aqt[qt6]==25.9.5"'
+          # whatever is newest: a new Anki release can turn this red without a commit here
+          - name: latest
+            python: "3.13"
+            packages: '"aqt[qt6]"'
+    name: anki (${{ matrix.name }})
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+      - run: pip install ${{ matrix.packages }}
+        shell: bash  # PowerShell, the default here, reads the < of a version pin as a redirection
+      - run: python tools/anki_smoke.py

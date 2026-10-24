@@ -1,0 +1,27 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+# Anki-managed / per-user state
+meta.json
+user_files/
+
+# Media and scratch files
+*.mkv
+*.mp4
+*.srt
+*.m4a
+*.mp3
+test.py
+
+# Packaging output and OS/editor junk
+*.ankiaddon
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# Build output
+dist/

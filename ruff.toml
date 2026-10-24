@@ -1,0 +1,10 @@
+line-length = 100
+target-version = "py39"   # Anki 2.1.50 bundles Python 3.9
+extend-exclude = ["vendor", ".venv", "user_files"]
+
+[lint]
+# F: pyflakes (undefined names, unused imports...); B: bugbear (late-binding closures in
+# loops, mutable defaults...); UP: pyupgrade, for syntax Python 3.9 has; E9: syntax errors
+select = ["F", "B", "UP", "E9"]
+# B008 (calls in defaults) and B905 (zip strict, 3.10+) don't fit Qt code on Python 3.9
+ignore = ["B008", "B905"]
